@@ -5,7 +5,7 @@
 - [ ] O'Reilly - Practical C Programming
 - [ ] Beej's Guide to Network Programming by Brian "Beej Jorgensen" Hall
 - [ ] Low-Level Programming C, Assembly, and Program Execution on Intel® 64 Architecture by Igor Zhirkov 
-- [ ] (reference) Programski jezik C - Predavanja, Jural M.
+- [ ] (reference) Programski jezik C - Predavanja, Jurak M.
 
 #### C++
 - [x] Programming: Principles and Practice Using C++, 2nd Ed. by Bjarne Stroustrup
