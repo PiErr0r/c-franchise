@@ -1,8 +1,7 @@
-# C/C++ and maybe C# + compilers
+# C/C++ and maybe C#
 
 #### C
 - [x] The C Programming Language by Brian Kernighan and Dennis Ritchie
-- [ ] Compilers Principles, Techniques, Tools by Alfred V. Aho, Monica S. Lam, Ravi Sethi, Jeffrey D. Ullman
 - [ ] O'Reilly - Practical C Programming
 - [ ] Beej's Guide to Network Programming by Brian "Beej Jorgensen" Hall
 - [ ] Low-Level Programming C, Assembly, and Program Execution on Intel® 64 Architecture by Igor Zhirkov 
