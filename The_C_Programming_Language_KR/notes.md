@@ -1,4 +1,5 @@
-# Chapter 2 - Types, operators and expressions
+# Notes
+## Chapter 2 - Types, operators and expressions
 
 - char:  		1
 - short: 		2
@@ -9,8 +10,10 @@
 - long double:	16
 
 - use `void` as function input parameter if the function doesn't accept parameters
-- `static` keyword initializes the variable with 0
+- `static` keyword initializes the variable with 0 (int) and it is visible only in the file where it is defined (same with the functions declared as static)
+- `external` keyword for using some global variable (initialized with 0)
 - `const` keyword if the variable is unmutable (can be used in function parameter declaration)
+- `register` keyword is for variables which will be heavily used so the compiler will store them in register for faster r/w
 
 sing extension: negative `char` will convert to negative `int` (on some machines)
 
@@ -30,3 +33,12 @@ unsigned get_bits(int x, int p, int n) {
 ```
 
 `x &= (x-1);` deletes the rightmost 1-bit of x
+
+## Chapter 4 - Functions and program structure
+
+example of debug macro:
+
+- `#define debug(expr) printf(#expr " = %g\n", expr)` => this will replace #expr with text provided to macro
+- `##` operator will concatenate arguments passed to macro 
+    - `#define paste(front, back) front ## back` => so paste (name, 1) creates the token name1
+
