@@ -29,7 +29,7 @@ int main(void) {
 ## Relative cost of operations
 
 | Operation | Relative cost |
-| --- | --- |
+| --- | ---: |
 | `printf` and `scanf` | 1000 |
 | `malloc` and `free` | 800 |
 | trig fncs (`sin`, `cos` ...) | 500 |
@@ -106,7 +106,8 @@ ia.o:ia.h ia.c
 
 The macro OBJ is a list of all the object ( .o) files. The lines:
 ```make
-hist: $(OBJ) $(CC) $(CFLAGS) -o hist $(OBJ)
+hist: $(OBJ) 
+    $(CC) $(CFLAGS) -o hist $(OBJ)
 ```
 tell make to create hist from the ob ject files. If any of the object files are out of date, make will re-create them.
 
