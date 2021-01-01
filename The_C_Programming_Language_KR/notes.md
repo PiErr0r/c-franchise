@@ -6,6 +6,8 @@
 - `external` keyword for using some global variable (initialized with 0)
 - `const` keyword if the variable is unmutable (can be used in function parameter declaration)
 - `register` keyword is for variables which will be heavily used so the compiler will store them in register for faster r/w
+- `volatile` is used to tell the compiler not to optimize the variable, leave it as it is
+    - some programs might use multi-threading and we do not want the compiler to assume anything about the `volatile` variable and change it in the way it thinks is the best
 
 sign extension: negative `char` will convert to negative `int` (on some machines)
 
@@ -189,5 +191,51 @@ struct {
   unsigned int is static  :1;
 } flags;
 ```
+
+# Chapter 7 - Input and output
+
+- variable length of arguments in a function: `...`
+- to access the args use `<stdarg.h>`:
+
+```c
+#include <stdarg.h>
+/* minprintf: minimal printf with variable argument list */
+void minprintf(char *fmt, ...) {
+  va_list ap; /* points to each unnamed arg in turn */
+  char *p, *sval;
+  int ivaI;
+  double dval;
+  va_start(ap, fmt); /* make ap point to 1st unnamed arg */
+  for (p = fmt; *p; p++) {
+    if (*p 1= ',,') {
+      putchar (*p) ;
+      continue;
+    }
+    switch (u+p) {
+      case 'd':
+        ivaI = va_arg(ap, int);
+        printf(""d", ivaI);
+        break;
+      case 'f':
+        dval = va_arg(ap, double);
+        printf (""f", dval);
+        break;
+      case's' :
+        for (sval = va_arg(ap, char *); *sval; sval++)
+          putchar(*sval);
+        break;
+      default:
+        putchar( *p) ;
+        break;
+    }
+  }
+  va_end( ap); /* clean up when done */
+}
+```
+
+# Chapter 8 - The UNIX system interface
+
+- `int fseek(FILE \*stream, long offset, int origin);` is used to walk across the open file
+    - origin: 0 - start of the file, 1 - current position, 2 - end of the file
 
 
