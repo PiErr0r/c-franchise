@@ -1,21 +1,13 @@
 # Notes
 ## Chapter 2 - Types, operators and expressions
 
-- char:  		1
-- short: 		2
-- int:   		4
-- long:  		8
-- float: 		4
-- double:		8
-- long double:	16
-
 - use `void` as function input parameter if the function doesn't accept parameters
 - `static` keyword initializes the variable with 0 (int) and it is visible only in the file where it is defined (same with the functions declared as static)
 - `external` keyword for using some global variable (initialized with 0)
 - `const` keyword if the variable is unmutable (can be used in function parameter declaration)
 - `register` keyword is for variables which will be heavily used so the compiler will store them in register for faster r/w
 
-sing extension: negative `char` will convert to negative `int` (on some machines)
+sign extension: negative `char` will convert to negative `int` (on some machines)
 
 `x = x & ~077;` is better for anullating the last 6 bits because it is size undependent unlike `x = x & 0177700` which expect x to be 16 bits long
 
