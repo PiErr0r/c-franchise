@@ -1,3 +1,7 @@
+/*
+ * to compile this file use: cc logger.c listen_ex.c -o listen.out
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,6 +74,8 @@ int main(void) {
     err("Can't accept a connection!");
     return 8;
   }
+
+  send(newfd, "Hello world!\n", 14, 0);
 
   close(sockfd);
   freeaddrinfo(res);
