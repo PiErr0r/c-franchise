@@ -1,27 +1,27 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-
-void err() {
-  fprintf(stderr, "\n[ERROR]\t");
-}
-
-void info(char* msg) {
-  fprintf(stdout, "\n[INFO]\t%s", msg);
-}
+#include "logger.h"
 
 int main(int argc, char* argv[]) {
   struct addrinfo hints, *res, *p;
   int status, sockfd;
   char ipstr[INET6_ADDRSTRLEN];
+  char *info_str = (char *)malloc(100 * sizeof(char));
+  char *err_str = (char *)malloc(100 * sizeof(char));
+  if (info_str == NULL || err_str == NULL) {
+    err("Couldn't allocate memory for err or info string");
+    return -1;
+  }
+
 
   if (argc != 3) {
-    err();
-    fprintf(stderr, "usage: hostname port\n");
+    err("usage: hostname port");
     return 1;
   }
 
@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
   hints.ai_socktype = SOCK_STREAM;
 
   if ((status = getaddrinfo(argv[1], argv[2], &hints, &res)) != 0) {
-    err();
-    fprintf(stderr, "getaddrinfo: %s", gai_strerror(status));
+    sprintf(err_str, "getaddrinfo: %s", gai_strerror(status));
+    err(err_str);
     return 2;
   }
 
@@ -52,8 +52,7 @@ int main(int argc, char* argv[]) {
       addr = &(ipv6->sin6_addr);
       ipver = "IPv6";
     } else {
-      err();
-      fprintf(stderr, "Unknown address family!\n");
+      err("Unknown address family!");
     }
 
     inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
@@ -61,18 +60,18 @@ int main(int argc, char* argv[]) {
 
     sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) != -1) {
-      /* bind 
+      // bind
       if ((status = bind(sockfd, p->ai_addr, p->ai_addrlen)) == - 1){
-        err();
-        fprintf(stderr, "Not able to bind the socket descriptor!\n");
+        err("Not able to bind the socket descriptor!");
         return 3;
       }
-      break;
-      */
+      sprintf(info_str, "Bound to port %s", argv[2]);
+      info(info_str);
 
+      // connect
       if ((status = connect(sockfd, p->ai_addr, p->ai_addrlen)) == -1) {
-        err();
-        fprintf(stderr, "Couldn't connect to host: %s\n", argv[1]);
+        sprintf(err_str, "Couldn't connect to host: %s", argv[1]);
+        err(err_str);
         return 4;
       }
       info("Connected");

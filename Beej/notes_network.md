@@ -24,7 +24,7 @@ struct sockaddr {
 ```
 - sockaddr\_in (for IPv4, pointer to `sockaddr` ca be cast to `sockaddr_in`):
 ```c
-struct sockarrd_in {
+struct sockaddr_in {
   short int           sin_family;   // Address family, AF_INET
   unsigned short int  sin_port;     // Port number - in Network Byte Order (Big-endian)
   struct in_addr      sin_addr;     // Internet address
@@ -102,6 +102,14 @@ printf("The IPv6 address: %s\n", ip6);
 
 ## System calls
 
+### Order of calls
+
+1. `getaddrinfo()`
+2. `socket()`
+3. `bind()`
+4. `listen()`
+5. `accept()`
+
 ### `getaddrinfo`
 
 Declaration of [`getaddrinfo`](getaddrinfo_ex.c)
@@ -158,6 +166,71 @@ int connect(int sockfd, struct sockaddr* serv_addr, int addrlen);
 ```
 
 ### `listen`
+
+```c
+listen(int sockfd, int backlog); // backlog is number of connections allowed in queue before they get accepted
+```
+
+### `accept`
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int accept(int sockfd, struct sockaddr *addr, socketlen_t *addrlen);
+```
+
+### `send` and `recv`
+
+```c
+int send(int sockfd, const void* msg, int len, int flags); // returns number of bytes sent
+int recv(int sockfd, void* buf, int len, int flags); // returns number of bytes read (value of 0 means that connection was closed from the other side)
+```
+
+### `sendto` and `recvfrom` - datagram functions
+
+```c
+int sendto(int sockfd, const void *msg, int len, unsigned int flags,
+           const struct sockaddr *to, socklen_t tolen);
+
+int recvfrom(int sockfd, void *buf, int len, unsigned int flags,
+             struct sockaddr *from, int *fromlen);
+```
+
+### `close` and `shutdown`
+
+```c
+int close(int fd); // any file descriptor;
+int shutdown(int sockfd, int how); // return 0 on success or -1 on error
+/*
+
+how | Effect
+  0 | Disallow further recieves
+  1 | Disallow further sends
+  2 | Disallow further sends and recieves (this is what close does)
+*/
+```
+
+### `getpeername` - Who are you?
+
+```c
+#include <sys/socket.h>
+
+// their information is stored in addr
+int getpeername(int sockfd, struct sockaddr *addr, int *addrlen);
+```
+
+Once you have their address, you can use `inet_ntop()`, `getnameinfo()`, or `gethostbyaddr()` to print or get more information.
+
+### `gethostname` - Who am I?
+
+```c
+#include <unistd.h>
+
+int gethostname(char *hostname, size_t size);
+```
+
+
 
 
 
