@@ -66,3 +66,60 @@ struct sockaddr_storage {
 };
 ```
 > TODO: IPv6 Flow information and Scope ID (out of the scope of this guide)
+
+Saving and IP address to a struct with `inet_pton()`:
+
+```c
+struct sockaddr_in sin;
+struct sockaddr_in6 sin6;
+// inet_pton() returns -1 if there was an error, 0 if address is messed up and num greater than 0 otherwise
+inet_pton(AF_INET, "192.168.5.10", &(sin.sin_addr)); 
+inet_pton(AF_INET6, "2001:db8:63b3:1::3490", &(sin6.sin6_addr));
+
+// Obsolete as they don't support IPv6:
+// inet_addr();
+// inet_aton();
+```
+
+`inet_ntop()` does the inverse (network to presentation):
+```c
+// IPv4
+char ip4[INET_ADDRSTRLEN];
+struct sockaddr_in sa;
+
+inet_ntop(AF_INET, &(sa.sin_addr), ip4, INET_ADDRSTRLEN);
+printf("The IPv4 address: %s\n", ip4);
+
+// IPv6
+char ip6[INET6_ADDRSTRLEN];
+struct sockaddr_in6 sa6;
+
+inet_ntop(AF_INET6, &(sa6.sin6_addr), ip6, INET6_ADDRSTRLEN);
+printf("The IPv6 address: %s\n", ip6);
+
+// Obsolete inet_ntoa();
+```
+
+## System calls
+
+### `getaddrinfo`
+
+Declaration of [`getaddrinfo`](getaddrinfo_ex.c)
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+int getaddrinfo(
+  const char* node, // e.g. "www.example.com" or IP
+  const char* service, // e.g. "http" or port number
+  const struct addrinfo* hints,
+  struct addrinfo** res
+);
+```
+
+
+
+
+
