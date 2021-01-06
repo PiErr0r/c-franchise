@@ -119,6 +119,51 @@ int getaddrinfo(
 );
 ```
 
+### `socket` - File descriptor
+
+Declaration of `socket()`
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int socket(int domain, int type, int protocol);
+// ---
+
+int s; // socket descriptor
+s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+```
+
+`socket()` returns a socket descriptor for future sys calls or **-1 on error**
+
+### `bind` - Port
+
+get the port your socket is associated with (ports below 1024 are **RESERVED**, unless you are a superuser)
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int bind(int sockfd, struct sockaddr* my_addr, int addrlen);
+```
+
+
+### `connect`
+
+```c
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int connect(int sockfd, struct sockaddr* serv_addr, int addrlen);
+```
+
+### `listen`
+
+
+
+
+
+
 
 
 
