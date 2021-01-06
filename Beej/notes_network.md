@@ -183,8 +183,10 @@ int accept(int sockfd, struct sockaddr *addr, socketlen_t *addrlen);
 ### `send` and `recv`
 
 ```c
-int send(int sockfd, const void* msg, int len, int flags); // returns number of bytes sent
-int recv(int sockfd, void* buf, int len, int flags); // returns number of bytes read (value of 0 means that connection was closed from the other side)
+// returns number of bytes sent
+int send(int sockfd, const void* msg, int len, int flags);
+// returns number of bytes read (value of 0 means that connection was closed from the other side)
+int recv(int sockfd, void* buf, int len, int flags);
 ```
 
 ### `sendto` and `recvfrom` - datagram functions
