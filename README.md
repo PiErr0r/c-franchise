@@ -14,3 +14,5 @@
 - [x] Programming: Principles and Practice Using C++, 2nd Ed. by Bjarne Stroustrup
 - [ ] C++ Primer by Stanley B. Lippman, Josée Lajoie, Barbara E. Moo
 - [ ] (reference) The C++ Programming Language, 4th Edition by Bjarne Stroustrup
+
+https://stackoverflow.com/a/388282
