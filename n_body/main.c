@@ -9,8 +9,11 @@
 
 #define MIN_DISTANCE 50
 #define MIN_R 5
-#define MAX_R 20
+#define MAX_R 30
 #define G 500
+
+#define W 1600
+#define H 1200
 
 typedef struct {
     Vector2 a;
@@ -42,17 +45,17 @@ void check_bounds(Point *point) {
         point->v.x *= -.5f;
         point->s.x = 0.f;
     }
-    if (point->s.x > 800.f) {
+    if (point->s.x > W) {
         point->v.x *= -.5f;
-        point->s.x = 800.f;
+        point->s.x = W;
     }
     if (point->s.y < 0.f) {
         point->v.y *= -.5f;
         point->s.y = 0.f;
     }
-    if (point->s.y > 600.f) {
+    if (point->s.y > H) {
         point->v.y *= -.5f;
-        point->s.y = 600.f;
+        point->s.y = H;
     }
 }
 Vector2 distance(Vector2 a, Vector2 b) {
@@ -93,8 +96,6 @@ int main(int argc, char** argv)
         return 1;
     }
     const size_t N = atoi(argv[1]);
-    const size_t W = 800;
-    const size_t H = 600;
     InitWindow(W, H, "Raylib Template");
     SetTargetFPS(60);
 
