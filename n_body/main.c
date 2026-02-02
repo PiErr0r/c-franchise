@@ -7,7 +7,7 @@
 
 #define UNUSED(x) (void)(x)
 
-#define MIN_DISTANCE 50
+#define MIN_DISTANCE 150
 #define MIN_R 5
 #define MAX_R 30
 #define G 500
