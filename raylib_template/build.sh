@@ -4,9 +4,9 @@ cc \
     -Wall\
     -Wextra\
     -ggdb\
-    -I./raylib-5.5_linux_amd64/include/ \
+    -I/home/piero/Documents/programming/LIB/raylib/Release/include/ \
     -o ./main main.c \
-    -L./raylib-5.5_linux_amd64/lib/ \
+    -L/home/piero/Documents/programming/LIB/raylib/Release/lib/ \
     -l:libraylib.a \
     -lm
 
