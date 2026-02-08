@@ -1,3 +1,5 @@
+#include <time.h>
+
 #include "helpers.h"
 
 #define W 1600
@@ -18,6 +20,12 @@ typedef struct {
     double s;
 } ScreenPoint;
 
+typedef struct {
+    Vector3 p;
+    Vector3 v;
+    Vector3 a;
+    int r;
+} Ball;
 
 void print_Vector2(Vector2 v) {
     printf("{x = %f, y = %f\n", v.x, v.y);
@@ -57,18 +65,11 @@ Vector3 local_vector_to_global(Vector3 pt, Quaternion ego_r) {
     return (Vector3){ .x = res.x, .y = res.y, .z = res.z };
 }
 
-
 Vector3 global_to_local(Vector3 *pt, Vector3 ego_p, Quaternion ego_r) {
 
     Vector3 pt_R = Vector3RotateByQuaternion(*pt, ego_r);
     Vector3 pt_T = Vector3Subtract(pt_R, Vector3RotateByQuaternion(ego_p, ego_r));
     return pt_T;
-}
-
-void test() {
-    print_Vector3(QuaternionToEuler(QuaternionFromEuler(PI/2, 0, 0)));
-    print_Vector3(QuaternionToEuler(QuaternionFromEuler(0, PI/2, 0)));
-    print_Vector3(QuaternionToEuler(QuaternionFromEuler(PI/2, 0, PI/2)));
 }
 
 void rotate_ego(Quaternion *ego_r, double dz, double dy, double dx) {
@@ -77,7 +78,6 @@ void rotate_ego(Quaternion *ego_r, double dz, double dy, double dx) {
     Quaternion p = QuaternionFromEuler(dy, dz, dx);
     Quaternion qp = QuaternionMultiply(q, p);
     Quaternion qpqi = QuaternionMultiply(qp, qi);
-    print_Vector3(QuaternionToEuler(qpqi));
     *ego_r = QuaternionAdd(*ego_r, qpqi);
 }
 
@@ -148,14 +148,47 @@ void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
     if (IsKeyDown(KEY_D)) {
         pt.x += DP;
     }
+
     Quaternion rot = construct_quaternion_from_angles(yaw, pitch, roll);
     Vector3 move = local_vector_to_global(pt, *ego_r);
     *ego_r = QuaternionMultiply(rot, *ego_r);
     *ego_p = Vector3Add(*ego_p, move);
 }
 
+Vector3 get_random_vector() {
+    return (Vector3){
+        .x = drand48() * 2.f - 1.f,
+        .y = drand48() * 2.f - 1.f,
+        .z = drand48() * 2.f - 1.f
+    };
+}
+
+Ball create_random_ball(void) {
+    Ball b = {
+        .p = get_random_vector(),
+        .v = Vector3Scale(get_random_vector(), 10.f),
+        .a = {0}
+    };
+    return b;
+}
+
+void update_ball(Ball *b, double dt) {
+    b->v = Vector3Add(b->v, Vector3Scale(b->a, dt));
+    b->p = Vector3Add(b->p, Vector3Scale(b->v, dt));
+    if (b->p.x <= -1 || b->p.x >= 1) {
+        b->v.x *= -1.f;
+    }
+    if (b->p.y <= -1 || b->p.y >= 1) {
+        b->v.y *= -1.f;
+    }
+    if (b->p.z <= -1 || b->p.z >= 1) {
+        b->v.z *= -1.f;
+    }
+}
+
 int main(void)
 {
+    srand48(time(NULL));
     InitWindow(W, H, "Raylib Template");
     SetTargetFPS(60);
     Points points = {0};
@@ -177,9 +210,10 @@ int main(void)
         {2, 6},
         {3, 7}
     };
+    Ball b = create_random_ball();
 
-    Vector3 ego_p = { .x = -4.f, .y = 0.f, .z = 0.f };
-    Quaternion ego_r = construct_quaternion_from_angles(PI/2, 0, PI/2);
+    Vector3 ego_p = { .x = 5.f, .y = 5.f, .z = 5.f };
+    Quaternion ego_r = construct_quaternion_from_angles(-PI/2.f, 2.5f * PI / 4.f, 0.f);
 
     double t = 0.f;
     double dt = 1e-3;
@@ -188,6 +222,9 @@ int main(void)
         }
         register_movement(&ego_p, &ego_r);
 
+        update_ball(&b, dt);
+        ScreenPoint bsp = global_to_screen(&b.p, ego_p, ego_r);
+        DrawCircleV(bsp.point, bsp.s, WHITE);
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         for (size_t i = 0; i < 6; ++i) {
