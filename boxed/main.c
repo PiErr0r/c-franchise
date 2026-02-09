@@ -8,8 +8,21 @@
 #define HEIGHT_PRINCIPAL 0.75f
 #define FOCAL_LENGTH 1.f
 
-#define DP 0.05 // unitary position
-#define DTHETA PI/200 // unitary rotation delta
+#define DP 0.05         // unitary position
+#define DTHETA PI/200   // unitary rotation delta
+#define DT 1e-3         // delta time
+                        //
+#define BALL_INIT_V_SCALE 10.f
+#define BALL_R 0.05f
+
+#define BOX_BOUND 1.f
+
+#define EGO_INIT_X -5.f
+#define EGO_INIT_Y 0.f
+#define EGO_INIT_Z 0.f
+#define EGO_INIT_ROLL PI*0.5f
+#define EGO_INIT_PITCH 0.f
+#define EGO_INIT_YAW PI*0.5f
 
 typedef struct {
     Vector3* items;
@@ -36,10 +49,6 @@ void print_Quaternion(Quaternion q) {
     printf("{w = %f, x = %f, y = %f, z = %f}\n", q.w, q.x, q.y, q.z);
 }
 
-Quaternion QuaternionMultiply3(Quaternion q1, Quaternion q2, Quaternion q3) {
-    return QuaternionMultiply(QuaternionMultiply(q1, q2), q3);
-}
-
 Vector2 local_to_image(Vector3 v) {
     return (Vector2){
         .x = FOCAL_LENGTH * v.x / v.z,
@@ -62,7 +71,6 @@ Vector3 global_to_local(Vector3 pt, Vector3 ego_p, Quaternion ego_r) {
     Quaternion qi = QuaternionInvert(ego_r);
     Vector3 pt_R = Vector3RotateByQuaternion(pt, qi);
     Vector3 pt_T = Vector3Subtract(pt_R, Vector3RotateByQuaternion(ego_p, qi));
-
     return pt_T;
 }
 
@@ -71,49 +79,12 @@ double scale_local_to_screen(double r, Vector3 pt_global, Vector3 ego_p, Quatern
     double r_local = r / pt.z;
     double r_screen = r_local * WIDTH;
     return r_screen;
-    return r / pt.z;
-}
-
-void rotate_ego(Quaternion *ego_r, double dz, double dy, double dx) {
-    Quaternion q = *ego_r;
-    Quaternion qi = QuaternionInvert(q);
-    Quaternion p = QuaternionFromEuler(dy, dz, dx);
-    Quaternion qp = QuaternionMultiply(q, p);
-    Quaternion qpqi = QuaternionMultiply(qp, qi);
-    *ego_r = QuaternionAdd(*ego_r, qpqi);
-}
-
-Quaternion transform_by_quaternions(Quaternion p, Quaternion q1, Quaternion q2, Quaternion q3) {
-    Quaternion q1i = QuaternionInvert(q1);
-    Quaternion q2i = QuaternionInvert(q2);
-    Quaternion q3i = QuaternionInvert(q3);
-    Quaternion Qp = QuaternionMultiply(QuaternionMultiply(q3, q2), q1);
-    Quaternion Qpi = QuaternionMultiply(QuaternionMultiply(q1i, q2i), q3i);
-    return QuaternionMultiply(QuaternionMultiply(Qp, p), Qpi);
-}
-
-Quaternion construct_quaternion_from_angles(double yaw, double pitch, double roll) {
-    double cz = cosf(yaw/2.f);
-    double sz = sinf(yaw/2.f);
-    double cy = cosf(pitch/2.f);
-    double sy = sinf(pitch/2.f);
-    double cx = cosf(roll/2.f);
-    double sx = sinf(roll/2.f);
-    Quaternion qz = { .w = cz, .x = 0, .y = 0, .z = sz };
-    Quaternion qy = { .w = cy, .x = 0, .y = sy, .z = 0 };
-    Quaternion qx = { .w = cx, .x = sx, .y = 0, .z = 0 };
-    return QuaternionMultiply3(qx, qy, qz);
 }
 
 Vector2 global_to_screen(Vector3 v, Vector3 ego_p, Quaternion ego_r) {
     Vector3 local = global_to_local(v, ego_p, ego_r);
     Vector2 image = local_to_image(local);
     Vector2 screen = image_to_screen(image);
-    printf("!!\n");
-    print_Vector3(v);
-    print_Vector3(local);
-    print_Vector2(image);
-    print_Vector2(screen);
     return screen;
 }
 
@@ -159,13 +130,13 @@ void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
     if (IsKeyDown(KEY_D)) {
         pt.x += DP;
     }
-
     Vector3 move = local_vector_to_global(pt, *ego_r);
     *ego_p = Vector3Add(*ego_p, move);
 }
 
 Vector3 get_random_vector() {
     return (Vector3){
+        // [0,1] => [-1,1]
         .x = drand48() * 2.f - 1.f,
         .y = drand48() * 2.f - 1.f,
         .z = drand48() * 2.f - 1.f
@@ -175,22 +146,22 @@ Vector3 get_random_vector() {
 Ball create_random_ball(void) {
     Ball b = {
         .p = get_random_vector(),
-        .v = Vector3Scale(get_random_vector(), 10.f),
+        .v = Vector3Scale(get_random_vector(), BALL_INIT_V_SCALE),
         .a = {0}
     };
     return b;
 }
 
-void update_ball(Ball *b, double dt) {
-    b->p = Vector3Add(b->p, Vector3Scale(b->v, dt));
-    b->v = Vector3Add(b->v, Vector3Scale(b->a, dt));
-    if (b->p.x <= -1 || b->p.x >= 1) {
+void update_ball(Ball *b) {
+    b->p = Vector3Add(b->p, Vector3Scale(b->v, DT));
+    b->v = Vector3Add(b->v, Vector3Scale(b->a, DT));
+    if (fabsf(b->p.x) + BALL_R >= BOX_BOUND) {
         b->v.x *= -1.f;
     }
-    if (b->p.y <= -1 || b->p.y >= 1) {
+    if (fabsf(b->p.y) + BALL_R >= BOX_BOUND) {
         b->v.y *= -1.f;
     }
-    if (b->p.z <= -1 || b->p.z >= 1) {
+    if (fabsf(b->p.z) + BALL_R >= BOX_BOUND) {
         b->v.z *= -1.f;
     }
 }
@@ -221,21 +192,31 @@ int main(void)
     };
     Ball ball = create_random_ball();
 
-    Vector3 ego_p = { .x = -5.f, .y = 0.f, .z = 0.f };
-    Quaternion a = { .w = cosf(PI*0.25f), .x = sinf(PI*0.25f), .y = 0.f, .z = 0.f };
-    Quaternion b = { .w = cosf(PI*0.25f), .x = 0.f, .y = 0.f, .z = sinf(PI*0.25f) };
-    Quaternion ego_r = QuaternionMultiply(b, a);
+    Vector3 ego_p = { .x = EGO_INIT_X, .y = EGO_INIT_Y, .z = EGO_INIT_Z };
+    Quaternion rot_x = {
+        .w = cosf(EGO_INIT_ROLL*0.5f),
+        .x = sinf(EGO_INIT_ROLL*0.5f),
+        .y = 0.f,
+        .z = 0.f
+    };
+    Quaternion rot_z = {
+        .w = cosf(EGO_INIT_YAW*0.5f),
+        .x = 0.f,
+        .y = 0.f,
+        .z = sinf(EGO_INIT_YAW*0.5f)
+    };
+    // right multiply since in local crs
+    Quaternion ego_r = QuaternionMultiply(rot_z, rot_x);
 
     double t = 0.f;
-    double dt = 1e-3;
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         register_movement(&ego_p, &ego_r);
 
-        update_ball(&ball, dt);
+        update_ball(&ball);
         Vector2 ball_screen = global_to_screen(ball.p, ego_p, ego_r);
-        double ball_r = scale_local_to_screen(0.05f, ball.p, ego_p, ego_r);
+        double ball_r = scale_local_to_screen(BALL_R, ball.p, ego_p, ego_r);
         DrawCircleV(ball_screen, ball_r, WHITE);
         for (size_t i = 0; i < 6; ++i) {
             size_t sz = i < 2 ? 4 : 2;
@@ -251,7 +232,7 @@ int main(void)
         Vector2 pt = global_to_screen(V, ego_p, ego_r);
         DrawCircleV(pt, scale_local_to_screen(0.03f, V, ego_p, ego_r), RED);
         EndDrawing();
-        t += dt;
+        t += DT;
     }
     CloseWindow();
 
