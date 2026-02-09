@@ -2,10 +2,12 @@
 
 #include "helpers.h"
 
-#define W 1600
-#define H 1200
+#define WIDTH 1600
+#define WIDTH_PRINCIPAL 1.f
+#define HEIGHT 1200
+#define HEIGHT_PRINCIPAL 0.75f
+#define FOCAL_LENGTH 1.f
 
-#define R 40
 #define DP 0.05 // unitary position
 #define DTHETA PI/200 // unitary rotation delta
 
@@ -14,11 +16,6 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Points;
-
-typedef struct {
-    Vector2 point;
-    double s;
-} ScreenPoint;
 
 typedef struct {
     Vector3 p;
@@ -43,33 +40,38 @@ Quaternion QuaternionMultiply3(Quaternion q1, Quaternion q2, Quaternion q3) {
     return QuaternionMultiply(QuaternionMultiply(q1, q2), q3);
 }
 
-Vector2 project(Vector3 v) {
-    return (Vector2){ .x = v.x / v.z, .y = v.y / v.z};
-}
-
-Vector2 screen(Vector2 v) {
+Vector2 local_to_image(Vector3 v) {
     return (Vector2){
-        .x = (v.x + 1) * W / 2,
-        .y = (v.y - 0.75) * (-H) / 1.5
+        .x = FOCAL_LENGTH * v.x / v.z,
+        .y = FOCAL_LENGTH * v.y / v.z
     };
 }
 
-double scale(double r, Vector3 pt) {
-    return r / pt.z;
+Vector2 image_to_screen(Vector2 v) {
+    return (Vector2){
+        .x = (v.x + WIDTH_PRINCIPAL) * WIDTH / (WIDTH_PRINCIPAL * 2.f),
+        .y = (v.y - HEIGHT_PRINCIPAL) * (-HEIGHT) / (HEIGHT_PRINCIPAL * 2.f)
+    };
 }
 
 Vector3 local_vector_to_global(Vector3 pt, Quaternion ego_r) {
-    Quaternion p = { .w = 0, .x = pt.x, .y = pt.y, .z = pt.z };
-    Quaternion qi = QuaternionInvert(ego_r);
-    Quaternion res = QuaternionMultiply3(qi, p, ego_r);
-    return (Vector3){ .x = res.x, .y = res.y, .z = res.z };
+    return Vector3RotateByQuaternion(pt, ego_r);
 }
 
-Vector3 global_to_local(Vector3 *pt, Vector3 ego_p, Quaternion ego_r) {
+Vector3 global_to_local(Vector3 pt, Vector3 ego_p, Quaternion ego_r) {
+    Quaternion qi = QuaternionInvert(ego_r);
+    Vector3 pt_R = Vector3RotateByQuaternion(pt, qi);
+    Vector3 pt_T = Vector3Subtract(pt_R, Vector3RotateByQuaternion(ego_p, qi));
 
-    Vector3 pt_R = Vector3RotateByQuaternion(*pt, ego_r);
-    Vector3 pt_T = Vector3Subtract(pt_R, Vector3RotateByQuaternion(ego_p, ego_r));
     return pt_T;
+}
+
+double scale_local_to_screen(double r, Vector3 pt_global, Vector3 ego_p, Quaternion ego_r) {
+    Vector3 pt = global_to_local(pt_global, ego_p, ego_r);
+    double r_local = r / pt.z;
+    double r_screen = r_local * WIDTH;
+    return r_screen;
+    return r / pt.z;
 }
 
 void rotate_ego(Quaternion *ego_r, double dz, double dy, double dx) {
@@ -103,13 +105,16 @@ Quaternion construct_quaternion_from_angles(double yaw, double pitch, double rol
     return QuaternionMultiply3(qx, qy, qz);
 }
 
-ScreenPoint global_to_screen(Vector3 *v, Vector3 ego_p, Quaternion ego_r) {
-    Vector3 pt_l = global_to_local(v, ego_p, ego_r);
-    Vector2 local = project(pt_l);
-    return (ScreenPoint){
-        .point = screen(local),
-        .s = scale(R, pt_l)
-    };
+Vector2 global_to_screen(Vector3 v, Vector3 ego_p, Quaternion ego_r) {
+    Vector3 local = global_to_local(v, ego_p, ego_r);
+    Vector2 image = local_to_image(local);
+    Vector2 screen = image_to_screen(image);
+    printf("!!\n");
+    print_Vector3(v);
+    print_Vector3(local);
+    print_Vector2(image);
+    print_Vector2(screen);
+    return screen;
 }
 
 void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
@@ -117,23 +122,29 @@ void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
     double pitch = 0;
     double roll = 0;
     if (IsKeyDown(KEY_LEFT)) {
-        pitch += DTHETA;
+        pitch -= DTHETA * 0.5f;
     }
     if (IsKeyDown(KEY_RIGHT)) {
-        pitch -= DTHETA;
+        pitch += DTHETA * 0.5f;
     }
     if (IsKeyDown(KEY_UP)) {
-        roll += DTHETA;
+        roll -= DTHETA * 0.5f;
     }
     if (IsKeyDown(KEY_DOWN)) {
-        roll -= DTHETA;
+        roll += DTHETA * 0.5f;
     }
     if (IsKeyDown(KEY_Q)) {
-        yaw += DTHETA;
+        yaw += DTHETA * 0.5f;
     }
     if (IsKeyDown(KEY_E)) {
-        yaw -= DTHETA;
+        yaw -= DTHETA * 0.5f;
     }
+    Quaternion rot_pitch = { .w = cosf(pitch), .x = 0.f, .y = sinf(pitch), .z = 0.f };
+    Quaternion rot_roll = { .w = cosf(roll), .x = sinf(roll), .y = 0.f, .z = 0.f };
+    Quaternion rot_yaw = { .w = cosf(yaw), .x = 0.f, .y = 0.f, .z = sinf(yaw) };
+    *ego_r = QuaternionMultiply(*ego_r, rot_pitch);
+    *ego_r = QuaternionMultiply(*ego_r, rot_roll);
+    *ego_r = QuaternionMultiply(*ego_r, rot_yaw);
 
     Vector3 pt = {0};
     if (IsKeyDown(KEY_W)) {
@@ -149,9 +160,7 @@ void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
         pt.x += DP;
     }
 
-    Quaternion rot = construct_quaternion_from_angles(yaw, pitch, roll);
     Vector3 move = local_vector_to_global(pt, *ego_r);
-    *ego_r = QuaternionMultiply(rot, *ego_r);
     *ego_p = Vector3Add(*ego_p, move);
 }
 
@@ -173,8 +182,8 @@ Ball create_random_ball(void) {
 }
 
 void update_ball(Ball *b, double dt) {
-    b->v = Vector3Add(b->v, Vector3Scale(b->a, dt));
     b->p = Vector3Add(b->p, Vector3Scale(b->v, dt));
+    b->v = Vector3Add(b->v, Vector3Scale(b->a, dt));
     if (b->p.x <= -1 || b->p.x >= 1) {
         b->v.x *= -1.f;
     }
@@ -189,7 +198,7 @@ void update_ball(Ball *b, double dt) {
 int main(void)
 {
     srand48(time(NULL));
-    InitWindow(W, H, "Raylib Template");
+    InitWindow(WIDTH, HEIGHT, "Raylib Template");
     SetTargetFPS(60);
     Points points = {0};
     Vector3 v = { .x = 1.f, .y = 1.f, .z = 1.f };
@@ -210,33 +219,37 @@ int main(void)
         {2, 6},
         {3, 7}
     };
-    Ball b = create_random_ball();
+    Ball ball = create_random_ball();
 
-    Vector3 ego_p = { .x = 5.f, .y = 5.f, .z = 5.f };
-    Quaternion ego_r = construct_quaternion_from_angles(-PI/2.f, 2.5f * PI / 4.f, 0.f);
+    Vector3 ego_p = { .x = -5.f, .y = 0.f, .z = 0.f };
+    Quaternion a = { .w = cosf(PI*0.25f), .x = sinf(PI*0.25f), .y = 0.f, .z = 0.f };
+    Quaternion b = { .w = cosf(PI*0.25f), .x = 0.f, .y = 0.f, .z = sinf(PI*0.25f) };
+    Quaternion ego_r = QuaternionMultiply(b, a);
 
     double t = 0.f;
     double dt = 1e-3;
     while (!WindowShouldClose()) {
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        }
-        register_movement(&ego_p, &ego_r);
-
-        update_ball(&b, dt);
-        ScreenPoint bsp = global_to_screen(&b.p, ego_p, ego_r);
-        DrawCircleV(bsp.point, bsp.s, WHITE);
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
+        register_movement(&ego_p, &ego_r);
+
+        update_ball(&ball, dt);
+        Vector2 ball_screen = global_to_screen(ball.p, ego_p, ego_r);
+        double ball_r = scale_local_to_screen(0.05f, ball.p, ego_p, ego_r);
+        DrawCircleV(ball_screen, ball_r, WHITE);
         for (size_t i = 0; i < 6; ++i) {
             size_t sz = i < 2 ? 4 : 2;
             for (size_t j = 0; j < sz; ++j) {
                 size_t idx1 = lines[i][j];
                 size_t idx2 = lines[i][(j + 1) % sz];
-                ScreenPoint p1 = global_to_screen(&points.items[idx1], ego_p, ego_r);
-                ScreenPoint p2 = global_to_screen(&points.items[idx2], ego_p, ego_r);
-                DrawLineV(p1.point, p2.point, BLUE);
+                Vector2 p1 = global_to_screen(points.items[idx1], ego_p, ego_r);
+                Vector2 p2 = global_to_screen(points.items[idx2], ego_p, ego_r);
+                DrawLineV(p1, p2, BLUE);
             }
         }
+        Vector3 V = {0,0,1};
+        Vector2 pt = global_to_screen(V, ego_p, ego_r);
+        DrawCircleV(pt, scale_local_to_screen(0.03f, V, ego_p, ego_r), RED);
         EndDrawing();
         t += dt;
     }
