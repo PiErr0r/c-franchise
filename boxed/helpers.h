@@ -5,6 +5,8 @@
 #include <stdlib.h>
 
 #define UNUSED(x) (void)(x)
+#define TODO(message) do { fprintf(stderr, "%s:%d TODO: %s\n", __FILE__, __LINE__, message);} while (0)
+#define UNREACHABLE(message) do { fprintf(stderr, "%s:%d UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while (0)
 #define da_realloc(da)\
             (da)->items = \
                 realloc((da)->items, (da)->capacity * sizeof(*(da)->items))
