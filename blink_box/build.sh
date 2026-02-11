@@ -1,9 +1,9 @@
 #!/bin/bash
 
 cc \
-    -Wall\
-    -Wextra\
-    -ggdb\
+    -Wall \
+    -Wextra \
+    -ggdb \
     -I/home/piero/Documents/programming/LIB/raylib/Release/include/ \
     -o ./main main.c \
     -L/home/piero/Documents/programming/LIB/raylib/Release/lib/ \

@@ -252,6 +252,17 @@ double lerp(double i_min, double i_max, double o_min, double o_max, double t) {
     return p * (o_max - o_min) + o_min;
 }
 
+void clean_tiles(Tiles* tiles, double t) {
+    size_t i = tiles->count;
+    if (i == 0) return;
+    do {
+        --i;
+        if (t - tiles->items[i].hit_time > TILE_FADE_TIME + 1.f) {
+            da_remove(tiles, i);
+        }
+    } while ( i != 0);
+}
+
 int main(void)
 {
     srand(time(NULL));
@@ -307,6 +318,7 @@ int main(void)
         if (did_bounce) {
             da_append(&tiles, tile);
         }
+        clean_tiles(&tiles, t);
 
         da_foreach(&tiles, Tile, tt) {
             if (t - tt->hit_time > TILE_FADE_TIME) continue;
