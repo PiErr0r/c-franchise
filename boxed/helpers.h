@@ -35,11 +35,16 @@
 
 #define da_remove(da, idx)\
     do {\
-        for (size_t i = idx; i < (da)->count; i++) {\
-            (da)->items[(idx)] = (da)->items[(idx) + 1];\
+        for (size_t index = (idx); index + 1 < (da)->count; ++index) {\
+            (da)->items[index] = (da)->items[index + 1];\
         }\
-        (da)->count--;\
+        --(da)->count;\
     } while (0)
+#define da_remove_unordered(da, i)\
+    do {\
+        size_t j = (i);\
+        (da)->items[j] = (da)->items[--(da)->count];\
+    } while(0)
 
 #define da_foreach(da, Type, it)\
     for (Type *it = (da)->items; it < (da)->items + (da)->count; ++it)

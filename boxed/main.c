@@ -12,21 +12,26 @@
 #define DP 0.05         // unitary position
 #define DTHETA PI/200   // unitary rotation delta
 #define DT 1e-3         // delta time
+#define G 9.81f
 
-#define BALL_INIT_V_SCALE 30.f
-#define BALL_R 0.05f
+#define BALLS_NUM 10
+#define BALL_INIT_V_SCALE 40.f
+#define BALL_A_SCALE 100.f
+#define BALL_R 0.07f
 
-#define BOX_BOUND 1.f
+#define BB_X_MAX  1.f
+#define BB_X_MIN -1.f
+#define BB_Y_MAX  1.f
+#define BB_Y_MIN -1.f
+#define BB_Z_MAX  2.f
+#define BB_Z_MIN  0.f
 
-#define EGO_INIT_X -5.f
-#define EGO_INIT_Y 0.f
-#define EGO_INIT_Z 0.f
-#define EGO_INIT_ROLL PI*0.5f
+#define EGO_INIT_X 4.5f
+#define EGO_INIT_Y -3.f
+#define EGO_INIT_Z 4.f
+#define EGO_INIT_ROLL (PI * 0.6666f)
 #define EGO_INIT_PITCH 0.f
-#define EGO_INIT_YAW PI*0.5f
-
-#define TILE_FADE_TIME 0.09f
-#define TILE_CLAMP_RESOLUTION 0.1f
+#define EGO_INIT_YAW (PI * -0.6666f)
 
 typedef struct {
     Vector3* items;
@@ -35,31 +40,19 @@ typedef struct {
 } Points;
 
 typedef struct {
+    double r;
+    bool alive;
     Vector3 p;
     Vector3 v;
     Vector3 a;
-    int r;
+    Color c;
 } Ball;
 
 typedef struct {
-    Color color;
-    Vector3 hit_point;
-    double hit_time;
-} Tile;
-
-typedef struct {
-    Tile* items;
+    Ball* items;
     size_t count;
     size_t capacity;
-} Tiles;
-
-Vector2 TILE_D[4] = {
-    // dx,dy
-    {-TILE_CLAMP_RESOLUTION, TILE_CLAMP_RESOLUTION},
-    {TILE_CLAMP_RESOLUTION, TILE_CLAMP_RESOLUTION},
-    {TILE_CLAMP_RESOLUTION, -TILE_CLAMP_RESOLUTION},
-    {-TILE_CLAMP_RESOLUTION, -TILE_CLAMP_RESOLUTION}
-};
+} Balls;
 
 void print_Vector2(Vector2 v) {
     printf("{x = %f, y = %f\n", v.x, v.y);
@@ -165,20 +158,39 @@ void register_movement(Vector3 *ego_p, Quaternion *ego_r) {
     *ego_p = Vector3Add(*ego_p, move);
 }
 
-Vector3 get_random_vector() {
+Vector3 get_random_position() {
     return (Vector3){
         // [0,1] => [-1,1]
         .x = drand48() * 2.f - 1.f,
         .y = drand48() * 2.f - 1.f,
-        .z = drand48() * 2.f - 1.f
+        // [0,1] => [0, 2]
+        .z = drand48() * 2.f
     };
+}
+
+Vector3 get_random_velocity() {
+    return (Vector3){
+        // [0,1] => [-1,1]
+        .x = drand48() * 2.f - 1.f,
+        .y = drand48() * 2.f - 1.f,
+        // [0,1] => [-2, 0]
+        .z = drand48() * 2.f * -1
+    };
+}
+
+Color get_random_color() {
+    size_t idx = rand() % C_N;
+    return COLORS[idx];
 }
 
 Ball create_random_ball(void) {
     Ball b = {
-        .p = get_random_vector(),
-        .v = Vector3Scale(get_random_vector(), BALL_INIT_V_SCALE),
-        .a = {0}
+        .alive = true,
+        .p = get_random_position(),
+        .v = Vector3Scale(get_random_velocity(), BALL_INIT_V_SCALE),
+        .a = {.z = -G},
+        .r = BALL_R,
+        .c = get_random_color()
     };
     return b;
 }
@@ -194,51 +206,38 @@ double clamp_to_one(double value) {
     return value < 0 ? -1.f : 1.f;
 }
 
-bool update_ball(Ball *b, Tile* tile) {
-    bool did_bounce = false;
-    b->p = Vector3Add(b->p, Vector3Scale(b->v, DT));
-    b->v = Vector3Add(b->v, Vector3Scale(b->a, DT));
-    if (fabsf(b->p.x) + BALL_R >= BOX_BOUND) {
-        b->v.x *= -1.f;
-        tile->hit_point = (Vector3){
-            .x = clamp_to_one(b->p.x),
-            .y = clamp(b->p.y, TILE_CLAMP_RESOLUTION),
-            .z = clamp(b->p.z, TILE_CLAMP_RESOLUTION)
-        };
-        did_bounce = true;
-    }
-    if (fabsf(b->p.y) + BALL_R >= BOX_BOUND) {
-        b->v.y *= -1.f;
-        tile->hit_point = (Vector3){
-            .x = clamp(b->p.x, TILE_CLAMP_RESOLUTION),
-            .y = clamp_to_one(b->p.y),
-            .z = clamp(b->p.z, TILE_CLAMP_RESOLUTION)
-        };
-        did_bounce = true;
-    }
-    if (fabsf(b->p.z) + BALL_R >= BOX_BOUND) {
-        b->v.z *= -1.f;
-        tile->hit_point = (Vector3){
-            .x = clamp(b->p.x, TILE_CLAMP_RESOLUTION),
-            .y = clamp(b->p.y, TILE_CLAMP_RESOLUTION),
-            .z = clamp_to_one(b->p.z)
-        };
-        did_bounce = true;
-    }
-    return did_bounce;
-}
-
-Vector3 add_to_tile(Vector3 v, size_t idx) {
-    if (fabs(fabs(v.x) - BOX_BOUND) < EPSILON) {
-        return (Vector3){ .x = v.x, .y = v.y + TILE_D[idx].x, .z = v.z + TILE_D[idx].y };
-    } else if (fabs(fabs(v.y) - BOX_BOUND) < EPSILON) {
-        return (Vector3){ .x = v.x + TILE_D[idx].x, .y = v.y, .z = v.z + TILE_D[idx].y};
-    } else if (fabs(fabs(v.z) - BOX_BOUND) < EPSILON) {
-        return (Vector3){ .x = v.x + TILE_D[idx].x, .y = v.y + TILE_D[idx].y, .z = v.z };
+void update_ball(Ball *b, Balls *balls) {
+    if (b->p.z <= BB_Z_MAX && fabs(b->p.x) < BB_X_MAX && fabs(b->p.y) < BB_Y_MAX) {
+        if (b->p.x - BALL_R <= BB_X_MIN || b->p.x + BALL_R >= BB_X_MAX) {
+            b->v.x *= -1.f;
+        }
+        if (b->p.y - BALL_R <= BB_Y_MIN || b->p.y + BALL_R >= BB_Y_MAX) {
+            b->v.y *= -1.f;
+        }
+        if (b->p.z - BALL_R <= BB_Z_MIN) {
+            b->v.z *= -1.f;
+        }
     } else {
-        UNREACHABLE("add_to_tile");
-        return (Vector3){0};
+        if (b->p.z - BALL_R <= BB_Z_MIN) {
+            b->alive = false;
+            return;
+        }
     }
+    da_foreach(balls, Ball, ball) {
+        if (ball == b) continue;
+        double d = Vector3Distance(ball->p, b->p);
+        double min_d = ball->r + b->r;
+        if (d <= min_d) {
+            Vector3 dp = Vector3Subtract(ball->p, b->p);
+            dp = Vector3Normalize(dp);
+            double v = Vector3Length(b->v) + Vector3Length(ball->v);
+            b->v = Vector3Scale(dp, -v * 0.5f);
+            ball->v = Vector3Scale(dp, v * 0.5f);
+        }
+    }
+
+    b->p = Vector3Add(b->p, Vector3Scale(b->v, DT));
+    b->v = Vector3Add(b->v, Vector3Scale(b->a, BALL_A_SCALE * DT));
 }
 
 double cross_direction(Vector2 vw0, Vector2 v1, Vector2 w1) {
@@ -252,15 +251,46 @@ double lerp(double i_min, double i_max, double o_min, double o_max, double t) {
     return p * (o_max - o_min) + o_min;
 }
 
-void clean_tiles(Tiles* tiles, double t) {
-    size_t i = tiles->count;
-    if (i == 0) return;
+void create_cube(Points *points) {
+    Vector3 v;
+    v = (Vector3){ .x = BB_X_MAX, .y = BB_Y_MAX, .z = BB_Z_MIN };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MIN, .y = BB_Y_MAX, .z = BB_Z_MIN };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MIN, .y = BB_Y_MIN, .z = BB_Z_MIN };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MAX, .y = BB_Y_MIN, .z = BB_Z_MIN };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MAX, .y = BB_Y_MAX, .z = BB_Z_MAX };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MIN, .y = BB_Y_MAX, .z = BB_Z_MAX };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MIN, .y = BB_Y_MIN, .z = BB_Z_MAX };
+    da_append(points, v);
+    v = (Vector3){ .x = BB_X_MAX, .y = BB_Y_MIN, .z = BB_Z_MAX };
+    da_append(points, v);
+}
+
+void spawn_new_balls(Balls *balls) {
+    for (size_t i = balls->count; i < BALLS_NUM; ++i) {
+        Ball b = create_random_ball();
+        da_append(balls, b);
+    }
+}
+
+void remove_dead_balls(Balls *balls) {
+    size_t i = balls->count - 1;
     do {
-        --i;
-        if (t - tiles->items[i].hit_time > TILE_FADE_TIME + 1.f) {
-            da_remove(tiles, i);
+        if (!balls->items[i].alive) {
+            // for (size_t j = i; j < balls->count; ++j) {
+            //     balls->items[j] = balls->items[j+1];
+            // }
+            // --balls->count;
+
+            da_remove(balls, i);
         }
-    } while ( i != 0);
+        --i;
+    } while (i != 0);
 }
 
 int main(void)
@@ -270,16 +300,7 @@ int main(void)
     InitWindow(WIDTH, HEIGHT, "Raylib Template");
     SetTargetFPS(60);
     Points points = {0};
-    Vector3 v = { .x = 1.f, .y = 1.f, .z = 1.f };
-    for (size_t i = 0; i < 8; ++i) {
-        if (i % 4 == 0)
-            v.z *= -1;
-        if (i % 2 == 0)
-            v.y *= -1;
-        else
-            v.x *= -1;
-        da_append(&points, v);
-    }
+    create_cube(&points);
     size_t lines[6][4] = {
         {0, 1, 2, 3},
         {4, 5, 6, 7},
@@ -288,7 +309,11 @@ int main(void)
         {2, 6},
         {3, 7}
     };
-    Ball ball = create_random_ball();
+    Balls balls = {0};
+    for (size_t i = 0; i < BALLS_NUM; ++i) {
+        Ball ball = create_random_ball();
+        da_append(&balls, ball);
+    }
 
     Vector3 ego_p = { .x = EGO_INIT_X, .y = EGO_INIT_Y, .z = EGO_INIT_Z };
     Quaternion rot_x = {
@@ -306,44 +331,22 @@ int main(void)
     // right multiply since in local crs
     Quaternion ego_r = QuaternionMultiply(rot_z, rot_x);
 
-    Tiles tiles = {0};
     double t = 0.f;
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         register_movement(&ego_p, &ego_r);
 
-        Tile tile = { .hit_time = t, .color = COLORS[(size_t)rand() % C_N] };
-        bool did_bounce = update_ball(&ball, &tile);
-        if (did_bounce) {
-            da_append(&tiles, tile);
+        spawn_new_balls(&balls);
+        da_foreach(&balls, Ball, ball) {
+            if (!ball->alive) continue;
+            update_ball(ball, &balls);
+            Vector2 ball_screen = global_to_screen(ball->p, ego_p, ego_r);
+            double ball_r = scale_local_to_screen(ball->r, ball->p, ego_p, ego_r);
+            DrawCircleV(ball_screen, ball_r, ball->c);
         }
-        clean_tiles(&tiles, t);
+        remove_dead_balls(&balls);
 
-        da_foreach(&tiles, Tile, tt) {
-            if (t - tt->hit_time > TILE_FADE_TIME) continue;
-            Vector2 pts[4] = {0};
-            for (size_t i = 0; i < 4; ++i) {
-                Vector3 p = add_to_tile(tt->hit_point, i);
-                pts[i] = global_to_screen(p, ego_p, ego_r);
-            }
-            tt->color.a = lerp(0.f, TILE_FADE_TIME, 255, 0, t - tt->hit_time);
-            // direction is reversed since y is 0 on the top and increases down
-            if (cross_direction(pts[0], pts[1], pts[3]) < 0.f) {
-                DrawTriangle(pts[0], pts[1], pts[3], tt->color);
-            } else {
-                DrawTriangle(pts[0], pts[3], pts[1], tt->color);
-            }
-            if (cross_direction(pts[2], pts[1], pts[3]) < 0.f) {
-                DrawTriangle(pts[2], pts[1], pts[3], tt->color);
-            } else {
-                DrawTriangle(pts[2], pts[3], pts[1], tt->color);
-            }
-        }
-
-        Vector2 ball_screen = global_to_screen(ball.p, ego_p, ego_r);
-        double ball_r = scale_local_to_screen(BALL_R, ball.p, ego_p, ego_r);
-        DrawCircleV(ball_screen, ball_r, WHITE);
         for (size_t i = 0; i < 6; ++i) {
             size_t sz = i < 2 ? 4 : 2;
             for (size_t j = 0; j < sz; ++j) {
