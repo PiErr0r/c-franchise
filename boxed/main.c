@@ -54,6 +54,19 @@ typedef struct {
     size_t capacity;
 } Balls;
 
+typedef struct {
+    Vector3 p;
+    Vector3 v;
+    Vector3 a;
+    Color c;
+} Particle;
+
+typedef struct {
+    Particle* items;
+    size_t count;
+    size_t capacity;
+} Particles;
+
 void print_Vector2(Vector2 v) {
     printf("{x = %f, y = %f\n", v.x, v.y);
 }
@@ -278,18 +291,71 @@ void spawn_new_balls(Balls *balls) {
     }
 }
 
-void remove_dead_balls(Balls *balls) {
+void add_particles(Ball ball, Particles *particles) {
+    for (double vz = 0.1f; vz <= 1.5f; vz += 0.05f) {
+        for (double deg = 0.f; deg < 2.f * PI; deg += (2.f * PI) / 30.f) {
+            Vector3 v = {
+                .x = sinf(deg + drand48()) * 50.f,
+                .y = cosf(deg + drand48()) * 50.f,
+                .z = vz * 50.f
+            };
+            Particle p = {
+                .p = ball.p,
+                .v = v,
+                .a = { .z = -G, .y = 0, .x = 0 },
+                .c = ball.c
+            };
+            da_append(particles, p);
+        }
+    }
+}
+
+void remove_dead_balls(Balls *balls, Particles *particles) {
     size_t i = balls->count - 1;
     do {
         if (!balls->items[i].alive) {
-            // for (size_t j = i; j < balls->count; ++j) {
-            //     balls->items[j] = balls->items[j+1];
-            // }
-            // --balls->count;
-
+            add_particles(balls->items[i], particles);
             da_remove(balls, i);
         }
         --i;
+    } while (i != 0);
+}
+
+void draw_polygon(Points *points, Vector3 ego_p, Quaternion ego_r, Color color) {
+    Vector2 *pts = malloc(sizeof(Vector2) * (points->count + 1));
+    for (size_t i = 0; i < points->count; ++i) {
+        pts[i] = global_to_screen(points->items[i], ego_p, ego_r);
+    }
+    pts[points->count] = global_to_screen(points->items[0], ego_p, ego_r);
+    for (size_t i = 0; i < points->count; i += 2) {
+        if (cross_direction(pts[i+1], pts[i], pts[i+2]) < 0.f) {
+            DrawTriangle(pts[i+1], pts[i], pts[i+2], color);
+        } else {
+            DrawTriangle(pts[i+1], pts[i+2], pts[i], color);
+        }
+    }
+}
+
+void create_floor(Points *points, double scale_plane) {
+    da_append(points, ((Vector3){ .x = BB_X_MIN * scale_plane, .y = BB_Y_MIN * scale_plane, .z = BB_Z_MIN }));
+    da_append(points, ((Vector3){ .x = BB_X_MAX * scale_plane, .y = BB_Y_MIN * scale_plane, .z = BB_Z_MIN }));
+    da_append(points, ((Vector3){ .x = BB_X_MAX * scale_plane, .y = BB_Y_MAX * scale_plane, .z = BB_Z_MIN }));
+    da_append(points, ((Vector3){ .x = BB_X_MIN * scale_plane, .y = BB_Y_MAX * scale_plane, .z = BB_Z_MIN }));
+}
+
+void update_particle(Particle* particle) {
+    particle->p = Vector3Add(particle->p, Vector3Scale(particle->v, DT));
+    particle->v = Vector3Add(particle->v, Vector3Scale(particle->a, BALL_A_SCALE * DT));
+}
+
+void remove_dead_particles(Particles* particles) {
+    if (particles->count == 0) return;
+    size_t i = particles->count;
+    do {
+        --i;
+        if (particles->items[i].p.z < BB_Z_MIN) {
+            da_remove(particles, i);
+        }
     } while (i != 0);
 }
 
@@ -309,11 +375,16 @@ int main(void)
         {2, 6},
         {3, 7}
     };
+    Points floor_big = {0};
+    Points floor_cube = {0};
+    create_floor(&floor_cube, 1.f);
+    create_floor(&floor_big, 5.f);
     Balls balls = {0};
     for (size_t i = 0; i < BALLS_NUM; ++i) {
         Ball ball = create_random_ball();
         da_append(&balls, ball);
     }
+    Particles particles = {0};
 
     Vector3 ego_p = { .x = EGO_INIT_X, .y = EGO_INIT_Y, .z = EGO_INIT_Z };
     Quaternion rot_x = {
@@ -331,12 +402,18 @@ int main(void)
     // right multiply since in local crs
     Quaternion ego_r = QuaternionMultiply(rot_z, rot_x);
 
+    da_foreach(&floor_cube, Vector3, pt) {
+        print_Vector2(global_to_screen(*pt, ego_p, ego_r));
+    }
+
     double t = 0.f;
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         register_movement(&ego_p, &ego_r);
 
+        draw_polygon(&floor_big, ego_p, ego_r, (Color){ 135, 60, 190, 128 });
+        draw_polygon(&floor_cube, ego_p, ego_r, GREEN);
         spawn_new_balls(&balls);
         da_foreach(&balls, Ball, ball) {
             if (!ball->alive) continue;
@@ -345,7 +422,7 @@ int main(void)
             double ball_r = scale_local_to_screen(ball->r, ball->p, ego_p, ego_r);
             DrawCircleV(ball_screen, ball_r, ball->c);
         }
-        remove_dead_balls(&balls);
+        remove_dead_balls(&balls, &particles);
 
         for (size_t i = 0; i < 6; ++i) {
             size_t sz = i < 2 ? 4 : 2;
@@ -357,6 +434,14 @@ int main(void)
                 DrawLineV(p1, p2, BLUE);
             }
         }
+        da_foreach(&particles, Particle, particle) {
+            update_particle(particle);
+            Vector2 p_screen = global_to_screen(particle->p, ego_p, ego_r);
+            Vector2 p1 = Vector2Add(p_screen, (Vector2){ .x = 3, .y = -3});
+            Vector2 p2 = Vector2Add(p_screen, (Vector2){ .x = -3, .y = -3});
+            DrawTriangle(p_screen, p1, p2, particle->c);
+        }
+        remove_dead_particles(&particles);
         EndDrawing();
         t += DT;
     }
