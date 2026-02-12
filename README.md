@@ -1,5 +1,19 @@
 # C/C++ and maybe C#
 
+## TODO
+- [x] 2D n-body simulation
+- [x] space shooter game simulation
+- [x] blink box (ball inside invisible box and lights a small portion of side on bounce)
+- [x] boxed (10 balls in a box without a top, when a ball exits and hits the floor it creates "fireworks")
+- [ ] convex hull animation (multiple algorithms) [link](https://en.wikipedia.org/wiki/Convex_hull_algorithms#Algorithms)
+- [ ] particle simulation (fluid, smoke, fire)
+    - [simple fluid simulation](https://prideout.net/blog/old/blog/index.html@p=58.html)
+    - [noise based particles I](https://prideout.net/blog/old/blog/index.html@p=63.html)
+    - [noise based particles II](https://prideout.net/blog/old/blog/index.html@p=67.html)
+    - [deep opacity maps](https://prideout.net/blog/old/blog/index.html@p=69.html)
+    - literature/Visualization of smoke using particle systems.pdf
+- [ ] random noise (perlin?)
+
 #### C
 - [x] The C Programming Language by Brian Kernighan and Dennis Ritchie
 - [x] O'Reilly - Practical C Programming
@@ -7,7 +21,7 @@
 - [ ] -||- c
 - [ ] -||- gdb
 - [ ] -||- UNIX IPC
-- [ ] Low-Level Programming C, Assembly, and Program Execution on Intel® 64 Architecture by Igor Zhirkov 
+- [ ] Low-Level Programming C, Assembly, and Program Execution on Intel® 64 Architecture by Igor Zhirkov
 - [ ] (reference) Programski jezik C - Predavanja, Jurak M.
 
 #### C++
@@ -16,3 +30,4 @@
 - [ ] (reference) The C++ Programming Language, 4th Edition by Bjarne Stroustrup
 
 https://stackoverflow.com/a/388282
+
