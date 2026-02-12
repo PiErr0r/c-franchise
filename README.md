@@ -13,6 +13,7 @@
     - [deep opacity maps](https://prideout.net/blog/old/blog/index.html@p=69.html)
     - literature/Visualization of smoke using particle systems.pdf
 - [ ] random noise (perlin?)
+- [ ] web server (websocket, http...)
 
 #### C
 - [x] The C Programming Language by Brian Kernighan and Dennis Ritchie
