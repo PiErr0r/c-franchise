@@ -1,0 +1,3 @@
+cc
+-I/home/piero/Documents/programming/LIB/raylib/Release/include/
+-L/home/piero/Documents/programming/LIB/raylib/Release/lib/
