@@ -1,8 +1,10 @@
+#include <assert.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define UNUSED(x) (void)(x)
 #define TODO(message) do { fprintf(stderr, "%s:%d TODO: %s\n", __FILE__, __LINE__, message);} while (0)
