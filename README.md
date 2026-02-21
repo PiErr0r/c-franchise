@@ -6,6 +6,12 @@
 - [x] blink box (ball inside invisible box and lights a small portion of side on bounce)
 - [x] boxed (10 balls in a box without a top, when a ball exits and hits the floor it creates "fireworks")
 - [ ] convex hull (3D?) animation (multiple algorithms) [link](https://en.wikipedia.org/wiki/Convex_hull_algorithms#Algorithms)
+    - [x] Jarvis march
+    - [x] Graham scan
+    - [ ] quickhull
+    - [ ] mergehull
+    - [ ] Kirkpatrick–Seidel
+    - [ ] Akl-Toussant heuristic
 - [ ] image2ascii
     - color (hsv)
     - edge detection
