@@ -29,10 +29,6 @@
 #define da_pop(da)\
     do {\
         (da)->count--;\
-        if ((da)->count * 2 <= (da)->capacity) {\
-            (da)->capacity /= 2;\
-            da_realloc(da);\
-        }\
     } while (0)
 
 #define da_remove(da, idx)\
@@ -77,3 +73,14 @@ Color COLORS[C_N] = {
 	MAGENTA
 };
 
+void print_Vector2(Vector2 v) {
+    printf("{x = %f, y = %f\n", v.x, v.y);
+}
+
+void print_Vector3(Vector3 v) {
+    printf("{x = %f, y = %f, z = %f}\n", v.x, v.y, v.z);
+}
+
+void print_Quaternion(Quaternion q) {
+    printf("{w = %f, x = %f, y = %f, z = %f}\n", q.w, q.x, q.y, q.z);
+}
