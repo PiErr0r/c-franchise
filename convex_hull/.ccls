@@ -1,5 +1,0 @@
-cc
--DINCLUDE_SORT
--I/home/piero/Documents/programming/LIB/raylib/Release/include/
--I/home/piero/Documents/programming/LIB/sort/
--L/home/piero/Documents/programming/LIB/raylib/Release/lib/
