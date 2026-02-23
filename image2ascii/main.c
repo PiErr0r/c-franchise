@@ -3,11 +3,12 @@
 #include <stb_image.h>
 
 #define UNUSED(x) ((void)(x))
+#define EPSILON 1e-6
 
 #define GET_VALUE(data, y, x, X, n, N) (*((data) + (y)*(X)*(N) + (x)*(N) + (n)))
 #define GET_INDEX(y, x, X, n, N) ((y)*(X)*(N) + (x)*(N) + (n))
 
-#define INTENSITY " .'^*&@#"
+#define INTENSITY " .'~^*?#"
 
 #define P_BLACK()   printf("\033[30m")
 #define P_RED()     printf("\033[31m")
@@ -47,30 +48,54 @@ BG  FG  Color
 //    int desired_channels   -- if non-zero, # of image components requested in result
 
 
+typedef struct {
+    float hue, saturation, lightness;
+} HSL;
+
+float fmodf_pos(float v, float m) {
+    v = fmodf(v, m) + m;
+    return fmodf(v, m);
+}
+
+// _r, _g, _b = [0, 255]
+HSL rgb2hsl(unsigned int _r, unsigned int _g, unsigned int _b) {
+    float r = (float)_r / 255.f;
+    float g = (float)_g / 255.f;
+    float b = (float)_b / 255.f;
+    float X_max = fmax(fmax(r, g), b);
+    float X_min = fmin(fmin(r, g), b);
+    float V = X_max;
+    float C = X_max - X_min;
+    float L = V - C * 0.5f;
+    float Sv = fabsf(V) < EPSILON ? 0.f : (C/V);
+    float Sl = (fabs(L) < EPSILON || fabsf(1 - L) < EPSILON) ? 0.f : 2*(V-L)/(1-fabsf(2*L-1));
+    UNUSED(Sl);
+    float Hp;
+    if (fabsf(C) < EPSILON) {
+        Hp = 0;
+    } else if (fabsf(V - r) < EPSILON) {
+        Hp = fmodf((g - b) / C, 6.f);
+    } else if (fabsf(V - g) < EPSILON) {
+        Hp = (b - r) / C + 2.f;
+    } else if (fabsf(V - b) < EPSILON) {
+        Hp = (r - g) / C + 4.f;
+    } else {
+        printf("Cannot be here! Aborting...\n");
+        exit(2);
+    }
+    HSL hsl = { .hue = fmodf_pos(60 * Hp, 360.f), .saturation = Sv, .lightness = L };
+    return hsl;
+}
+
 void usage(const char* name) {
     printf("[ERROR] Usage:\n");
     printf("\t%s [path-to-image]\n", name);
 }
 
-unsigned int get_intensity(int i, int j, unsigned char* data, int x, int y, int n, const int cell_w, const int cell_h) {
-    UNUSED(y);
-    unsigned int result = 0;
-    for (int ii = 0; ii < cell_h; ++ii) {
-        for (int jj = 0; jj < cell_w; ++jj) {
-            for (int ch = 0; ch < n; ++ch) {
-                result += GET_VALUE(data, ii+i*cell_h, jj+j*cell_w, x, ch, n);
-            }
-        }
-    }
-    return result / (cell_w * cell_h * n);
-}
-
-// TODO(get_value);
-// TODO(get_lightness);
-
-unsigned int get_hue(int i, int j, unsigned char* data, int x, int y, int n, const int cell_w, const int cell_h) {
+HSL get_hsl(int i, int j, unsigned char* data, int x, int y, int n, const int cell_w, const int cell_h) {
     if (n < 3) {
-        return get_intensity(i, j, data, x, y, n, cell_w, cell_h);
+        // TODO();
+        exit(3);
     }
     unsigned int r = 0, g = 0, b = 0;
     for (int ii = 0; ii < cell_h; ++ii) {
@@ -84,64 +109,65 @@ unsigned int get_hue(int i, int j, unsigned char* data, int x, int y, int n, con
     r /= (cell_w * cell_h);
     g /= (cell_w * cell_h);
     b /= (cell_w * cell_h);
-    unsigned int M = r > g && r > b ? r : g > b ? g : b;
-    unsigned int m = r < g && r < b ? r : g < b ? g : b;
-    unsigned int C = M - m;
-    if (C == 0) {
-        printf("[ERROR] C\n");
-        return 0;
-    }
-    unsigned int Hp = (M == r) ? (((g-b)%256)/C) % 6 : (M == g) ? ((b-r)%256)/C + 2 : ((r-g)%256)/C + 4;
-    return 60 * (Hp);
+    return rgb2hsl(r, g, b);
 }
 
-void resize_data(unsigned char* old, int x, int y, int n, unsigned int* new, int w, int h) {
+void resize_data(unsigned char* old, int x, int y, int n, HSL* new, int w, int h) {
     const int cell_w = x / w;
     const int cell_h = y / h;
     for (int i = 0; i < h; ++i) {
         for (int j = 0; j < w; ++j) {
-            unsigned int intensity = get_intensity(i, j, old, x, y, n, cell_w, cell_h);
-            *(new + i * w + j) = intensity;
-            unsigned int hue = get_hue(i, j, old, x, y, n, cell_w, cell_h);
-            *(new + i * w + j) += (hue << 16);
+            HSL hsl = get_hsl(i, j, old, x, y, n, cell_w, cell_h);
+            *(new + i * w + j) = hsl;
         }
     }
 }
 
-char get_intensity_from_value(unsigned int v) {
-    static const int DIV = 256 / 8;
-    v = v & 0xFFFF;
-    return INTENSITY[(v/DIV)];
+char get_intensity_from_value(HSL hsl) {
+    int I = 8.f * hsl.lightness;
+    return INTENSITY[I];
 }
 
-unsigned int get_color_from_value(unsigned int v) {
-    v >>= 16;
-    return v / 60;
+unsigned int get_color_from_value(HSL hsl) {
+    if (hsl.lightness < 0.1) return 0;
+    else if (hsl.lightness > 0.9) return 7;
+    else if (hsl.saturation < 0.3) {
+        return hsl.lightness < 0.5 ? 0 : 7;
+    } else {
+        return 1 + (int)(hsl.hue / 60);
+    }
+    if (hsl.saturation < 0.45f && hsl.lightness > 0.55f) {
+        return 7;
+    } else if (hsl.saturation < 0.45f && hsl.lightness < 0.45f) {
+        return 0;
+    } else {
+        return 1 + (int)(hsl.hue / 60);
+    }
 }
 
-int G = 0;
 void print_color(unsigned int color) {
-    // if (color > 8) printf("[ERROR]\n");
-    G |= (1 << color);
     switch (color) {
 		case 0: P_BLACK();      break;
 		case 1: P_RED();        break;
-		case 2: P_GREEN();      break;
-		case 3: P_YELLOW();     break;
-		case 4: P_BLUE();       break;
-		case 5: P_MAGENTA();    break;
-		case 6: P_CYAN();       break;
+		case 2: P_YELLOW();     break;
+		case 3: P_GREEN();      break;
+		case 4: P_CYAN();       break;
+		case 5: P_BLUE();       break;
+		case 6: P_MAGENTA();    break;
 		case 7: P_WHITE();      break;
         default: break;
     }
 }
 
-void print_ascii(unsigned int* data, int w, int h) {
+void print_ascii(HSL* data, unsigned char *edges, int w, int h) {
     for (int i = 0; i < h; ++i) {
         for (int j = 0; j < w; ++j) {
             unsigned int color = get_color_from_value(*(data + i * w + j));
             print_color(color);
             char c = get_intensity_from_value(*(data + i * w + j));
+            if (*(edges + i * w + j) != ' ') {
+                c = *(edges + i * w + j);
+            }
             printf("%c", c);
             P_RESET();
         }
@@ -149,6 +175,106 @@ void print_ascii(unsigned int* data, int w, int h) {
     }
 }
 
+
+void print_hsl(HSL hsl) {
+    printf("{ .hue = %f, .saturation = %f, .lightness = %f }\n", hsl.hue, hsl.saturation, hsl.lightness);
+}
+
+unsigned char get_grayscale_value(int i, int j, unsigned char* data, int x, int y, int n, const int cell_w, const int cell_h) {
+    UNUSED(y);
+    unsigned int result = 0;
+    for (int ii = 0; ii < cell_h; ++ii) {
+        for (int jj = 0; jj < cell_w; ++jj) {
+            unsigned char r = GET_VALUE(data, i*cell_h+ii, j*cell_w+jj, x, 0, n);
+            unsigned char g = GET_VALUE(data, i*cell_h+ii, j*cell_w+jj, x, 1, n);
+            unsigned char b = GET_VALUE(data, i*cell_h+ii, j*cell_w+jj, x, 2, n);
+            result += (r + g + b) / 3;
+        }
+    }
+    return result / (cell_w * cell_h);
+}
+
+void resize_grayscale(unsigned char* old, int x, int y, int n, unsigned char* new, int w, int h) {
+    int cell_h = y / h;
+    int cell_w = x / w;
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < w; ++j) {
+            unsigned char value = get_grayscale_value(i, j, old, x, y, n, cell_w, cell_h);
+            *(new + i * w + j) = value;
+        }
+    }
+}
+
+char get_gs_value(unsigned char c) {
+    int DIV = 256 / 8;
+    return INTENSITY[c / DIV];
+}
+
+void print_gs_ascii(unsigned char* data, int w, int h) {
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < w; ++j) {
+            char c = get_gs_value(*(data + i * w + j));
+            printf("%c", c);
+        }
+        printf("\n");
+    }
+}
+
+void print_char_ascii(unsigned char* data, int w, int h) {
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < w; ++j) {
+            printf("%c", *(data + i * w + j));
+        }
+        printf("\n");
+    }
+}
+
+int conv_step3x3(int i, int j, unsigned char* A, int w, int* B) {
+    int res = 0;
+    for (int di = -1; di < 2; ++di) {
+        for (int dj = -1; dj < 2; ++dj) {
+            int v = *(A + (i + di) * w + (j + dj)) * *(B + (1 - di) * 3 + (1 + dj));
+            res += v;
+        }
+    }
+    return res;
+}
+
+// B = 3x3
+void convolution(unsigned char* A, int w, int h, int* B, int* out) {
+    for (int i = 1; i < h - 1; ++i) {
+        for (int j = 1; j < w - 1; ++j) {
+            int v = conv_step3x3(i, j, A, w, B);
+            *(out + i * w + j) = v;
+        }
+    }
+}
+
+void sobel(unsigned char* old, unsigned char* new, int w, int h) {
+    int Gx[] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+    int Gy[] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+    int* X = malloc(w * h * sizeof(int));
+    int* Y = malloc(w * h * sizeof(int));
+    int T = 240;
+    convolution(old, w, h, Gx, X);
+    convolution(old, w, h, Gy, Y);
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < w; ++j) {
+            int idx = i * w + j;
+            float v = X[idx] * X[idx] + Y[idx] * Y[idx];
+            v = sqrtf(v);
+            if (abs(X[idx]) > T && abs(Y[idx]) > T) {
+                new[idx] = '/';
+            } else if (abs(X[idx]) > T) {
+                new[idx] = '|';
+            } else if (abs(Y[idx]) > T) {
+                new[idx] = '_';
+            } else {
+                new[idx] = ' ';
+            }
+        }
+    }
+}
 
 int main(int argc, const char** argv)
 {
@@ -159,18 +285,19 @@ int main(int argc, const char** argv)
 
     int x, y, n;
     unsigned char *data = stbi_load(argv[1], &x, &y, &n, 0);
-    printf("%d %d %d\n", x, y, n);
-    printf("%d %d\n", GET_VALUE(data, 0, 0, x, 0, n), GET_VALUE(data, 200, 200, x, 0, n));
 
     int W = 120;
     int H = y * (float)W / (float)x / 2.f;
-    unsigned int *new_data = malloc(W * H * sizeof(int));
+    HSL* new_data = malloc(W * H * sizeof(HSL));
+
+    unsigned char *gs = malloc(W * H * sizeof(char));
+    resize_grayscale(data, x, y, n, gs, W, H);
+    unsigned char *edges = malloc(W * H * sizeof(char));
+    memset(edges, 0, W * H);
+    sobel(gs, edges, W, H);
     resize_data(data, x, y, n, new_data, W, H);
-    print_ascii(new_data, W, H);
-    for (int i = 31; i >= 0; --i) {
-        printf("%d", (G&(1<<i)) ? 1 : 0);
-    }
-    printf("\n");
+    print_ascii(new_data, edges, W, H);
+    // print_char_ascii(edges, W, H);
 
     return 0;
 }
