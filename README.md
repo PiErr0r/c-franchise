@@ -12,7 +12,7 @@
     - [ ] mergehull
     - [ ] Kirkpatrick–Seidel
     - [ ] Akl-Toussant heuristic
-- [ ] image2ascii
+- [x] image2ascii
     - color (hsv)
     - edge detection
     - scaling and size
