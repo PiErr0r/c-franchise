@@ -74,7 +74,7 @@ Color COLORS[C_N] = {
 };
 
 void print_Vector2(Vector2 v) {
-    printf("{x = %f, y = %f\n", v.x, v.y);
+    printf("{x = %f, y = %f\n}", v.x, v.y);
 }
 
 void print_Vector3(Vector3 v) {
