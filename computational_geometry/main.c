@@ -54,9 +54,9 @@ Vector2 to_screen(tPointi pt) {
     assert(-BB_Y <= pt[Y] && pt[Y] <= BB_Y);
     Vector2 spt = {0};
     // [-BB_X,BB_X] -> [0,W]
-    spt.x = ((float)pt[X] + BB_X) / (2.f * BB_X) * W;
-    // [-BB_Y,BB_Y] -> [0,H]
-    spt.y = ((float)pt[Y] + BB_Y) / (2.f * BB_Y) * H;
+    spt.x = ((float)pt[X] + BB_X) * W / (2.f * BB_X);
+    // [-BB_Y,BB_Y] -> [H, 0]
+    spt.y = (BB_Y - (float)pt[Y]) * H / (2.f * BB_Y);
     return spt;
 }
 
@@ -145,6 +145,52 @@ bool Intersect(tPointi a, tPointi b, tPointi c, tPointi d) {
         return true;
     }
     return false;
+}
+
+bool Diagonalie(tVertex a, tVertex b) {
+    tVertex c, c1;
+    c = vertices;
+    do {
+        c1 = c->next;
+        if (a != c && a != c1 && b != c && b != c1 &&
+            Intersect(a->v, b->v, c->v, c1->v)) {
+            return false;
+        }
+        c = c->next;
+    } while (c != vertices);
+    return true;
+}
+
+bool InCone(tVertex a, tVertex b) {
+    tVertex a0, a1;
+    a0 = a->prev;
+    a1 = a->next;
+
+    /*
+    // a is convex vertex
+    if (LeftOn(a->v, a1->v, a0->v)) {
+        return Left(a->v, b->v, a0->v)
+            && Left(b->v, a->v, a1->v);
+    }
+
+    // a is reflex
+    return !(  LeftOn(a->v, b->v, a1->v)
+            && LeftOn(b->v, a->v, a0->v));
+    */
+    // Improved version
+    // at most one of the left calls is false
+    int result = 0;
+    result += (int)Left(a->v, a1->v, b->v);
+    result += (int)Left(a->v, b->v, a0->v);
+    result += (int)Left(a->v, a0->v, a1->v);
+    return result >= 2;
+}
+
+bool Diagonal(tVertex a, tVertex b) {
+    // InCone has constant time complexity while Diagonal has n, so to short circuit unnecessary calls
+    // they are called first
+    // Improvement: one InCone is unnecessary
+    return /*InCone(a, b) &&*/ InCone(b, a) && Diagonalie(a, b);
 }
 
 int main(void)
