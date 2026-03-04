@@ -12,9 +12,12 @@ struct tVertexStructure {
     int vnum;
     tPointi v;
     bool ear;
+    bool active;
     tVertex next, prev;
 };
 tVertex vertices = NULL;
+
+typedef void (*fPrintDiagonal)(tVertex v1, tVertex v2);
 
 #define EXIT_FAILURE 1
 
@@ -151,4 +154,69 @@ bool Diagonal(tVertex a, tVertex b) {
     // they are called first
     // Improvement: one InCone is unnecessary
     return /*InCone(a, b) &&*/ InCone(b, a) && Diagonalie(a, b);
+}
+
+void EarInit(void) {
+    tVertex v0, v1, v2;
+    v1 = vertices;
+    do {
+        v1 = v1->next;
+        v0 = v1->prev;
+        v2 = v1->next;
+        v1->ear = Diagonal(v0, v2);
+        v1->active = true;
+    } while (v1 != vertices);
+}
+
+tVertex find_next(tVertex v) {
+    tVertex p = v;
+    if (p->active) p = p->next;
+    while (!p->active)
+        p = p->next;
+    return p;
+}
+
+tVertex find_prev(tVertex v) {
+    tVertex p = v;
+    if (p->active) p = p->prev;
+    while (!p->active)
+        p = p->prev;
+    return p;
+}
+
+void Triangulate(fPrintDiagonal print_diagonal_ptr) {
+    tVertex v0, v1, v2, v3, v4;
+    int n = 0;
+    v2 = vertices;
+    do {
+        ++n;
+        v2 = v2->next;
+    } while (v2 != vertices);
+    while (n > 3) {
+        v2 = vertices;
+        do {
+            assert(v2->active);
+            if (v2->ear) {
+                v3 = find_next(v2); v4 = find_next(v3);
+                v1 = find_prev(v2); v0 = find_prev(v1);
+                assert(v0->active);
+                assert(v1->active);
+                assert(v3->active);
+                assert(v4->active);
+
+                (*print_diagonal_ptr)(v1, v3);
+
+                v1->ear = Diagonal(v0, v3);
+                v3->ear = Diagonal(v1, v4);
+
+                v2->active = false;
+                vertices = v1;;
+
+                --n;
+                break;
+            }
+            v2 = find_next(v2);
+        } while (v2 != vertices);
+    }
+    printf("DONE\n");
 }

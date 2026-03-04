@@ -1,4 +1,4 @@
-#include "helpers.h"
+#include "triangulation.h"
 
 // reprojection
 #define W 1600
@@ -7,46 +7,30 @@
 #define BB_X 20.f
 #define BB_Y (((float)H/W)*BB_X)
 
-// data types
-#define X 0
-#define Y 1
-#define DIM 2
-typedef int tPointi[DIM];
+typedef struct {
+    tVertex a;
+    tVertex b;
+} PDiag;
 
-typedef struct tVertexStructure tsVertex;
-typedef tsVertex* tVertex;
-struct tVertexStructure {
-    int vnum;
-    tPointi v;
-    bool ear;
-    tVertex next, prev;
-};
-tVertex vertices = NULL;
+typedef struct {
+    PDiag* items;
+    size_t count;
+    size_t capacity;
+} PDiags;
 
-#define EXIT_FAILURE 1
-
-#define NEW(p, type)\
-    if ((p = (type *)malloc(sizeof(type))) == NULL) {\
-        printf("NEW: Out of memory");\
-        exit(EXIT_FAILURE);\
-    }
-
-#define ADD(head, p)\
-    if (head) {\
-        p->next = head;\
-        p->prev = head->prev;\
-        head->prev->next = p;\
-        head->prev = p;\
-    } else {\
-        head = p;\
-        head->next = head->prev = p;\
-    }
-
-#define FREE(p) if (p) { free((char*)p); p = NULL; }
+PDiags pdiags = {0};
 
 /** BEGIN: Visualization and logging helpers **/
 void print_tPointi(tPointi pt) {
     printf("{ .x = %d, .y = %d }\n", pt[X], pt[Y]);
+}
+
+void print_diagonal(tVertex v1, tVertex v2) {
+    printf("### Diagonal ###\n");
+    PDiag pdiag = { .a = v1, .b = v2};
+    da_append(&pdiags, pdiag);
+    print_tPointi(v1->v);
+    print_tPointi(v2->v);
 }
 
 Vector2 to_screen(tPointi pt) {
@@ -77,120 +61,37 @@ double polygon_area(Vector2 *points, size_t n) {
     return A * 0.5f;
 }
 
-int Area2(tPointi a, tPointi b, tPointi c) {
-    return (b[X]-a[X])*(c[Y]-a[Y]) -
-           (b[Y]-a[Y])*(c[X]-a[X]);
-}
 
-int AreaPoly2(void) {
-    int sum = 0;
-    tVertex p, a;
-    p = vertices;
-    a = p->next;
-    do {
-        sum += Area2(p->v, a->v, a->next->v);
-        a = a->next;
-    } while (a->next != vertices);
-    return sum;
-}
-
-bool Left(tPointi a, tPointi b, tPointi c) {
-    return Area2(a, b, c) > 0;
-}
-
-bool LeftOn(tPointi a, tPointi b, tPointi c) {
-    return Area2(a, b, c) >= 0;
-}
-
-bool Collinear(tPointi a, tPointi b, tPointi c) {
-    return Area2(a, b, c) == 0;
-}
-
-bool Xor(bool a, bool b) {
-    // negate values to ensure 0/1
-    return !a ^ !b;
-}
-
-bool Between(tPointi a, tPointi b, tPointi c) {
-    if (!Collinear(a, b, c)) {
-        return false;
-    }
-    if (a[X] != b[X])
-        return a[X] <= c[X] && c[X] <= b[X] ||
-               a[X] >= c[X] && c[X] >= b[X];
-    else
-        return a[Y] <= c[Y] && c[Y] <= b[Y] ||
-               a[Y] >= c[Y] && c[Y] >= b[Y];
-}
-
-bool IntersectProp(tPointi a, tPointi b, tPointi c, tPointi d) {
-    if (Collinear(a, b, c) ||
-        Collinear(a, b, d) ||
-        Collinear(c, d, a) ||
-        Collinear(c, d, b)) {
-        return false;
-    }
-    return Xor(Left(a, b, c), Left(a, b, d)) &&
-           Xor(Left(c, d, a), Left(c, d, b));
-}
-
-bool Intersect(tPointi a, tPointi b, tPointi c, tPointi d) {
-    if        (   IntersectProp(a, b, c, d)) {
-        return true;
-    } else if (   Between(a, b, c)
-               || Between(a, b, d)
-               || Between(c, d, a)
-               || Between(c, d, b)
-              ) {
-        return true;
-    }
-    return false;
-}
-
-bool Diagonalie(tVertex a, tVertex b) {
-    tVertex c, c1;
-    c = vertices;
-    do {
-        c1 = c->next;
-        if (a != c && a != c1 && b != c && b != c1 &&
-            Intersect(a->v, b->v, c->v, c1->v)) {
-            return false;
-        }
-        c = c->next;
-    } while (c != vertices);
-    return true;
-}
-
-bool InCone(tVertex a, tVertex b) {
-    tVertex a0, a1;
-    a0 = a->prev;
-    a1 = a->next;
-
-    /*
-    // a is convex vertex
-    if (LeftOn(a->v, a1->v, a0->v)) {
-        return Left(a->v, b->v, a0->v)
-            && Left(b->v, a->v, a1->v);
-    }
-
-    // a is reflex
-    return !(  LeftOn(a->v, b->v, a1->v)
-            && LeftOn(b->v, a->v, a0->v));
-    */
-    // Improved version
-    // at most one of the left calls is false
-    int result = 0;
-    result += (int)Left(a->v, a1->v, b->v);
-    result += (int)Left(a->v, b->v, a0->v);
-    result += (int)Left(a->v, a0->v, a1->v);
-    return result >= 2;
-}
-
-bool Diagonal(tVertex a, tVertex b) {
-    // InCone has constant time complexity while Diagonal has n, so to short circuit unnecessary calls
-    // they are called first
-    // Improvement: one InCone is unnecessary
-    return /*InCone(a, b) &&*/ InCone(b, a) && Diagonalie(a, b);
+void make_polygon() {
+    tVertex pt;
+    NEW(pt, tsVertex); pt->v[X] =  -1; pt->v[Y] = -8;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =   8; pt->v[Y] = -2;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  12; pt->v[Y] = -5;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  15; pt->v[Y] =  0;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =   8; pt->v[Y] = 10;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =   2; pt->v[Y] =  0;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  -1; pt->v[Y] =  4;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =   6; pt->v[Y] =  8;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  -9; pt->v[Y] = 11;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] = -13; pt->v[Y] =  9;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] = -11; pt->v[Y] =  2;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  -3; pt->v[Y] =  0;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] = -14; pt->v[Y] = -1;
+    ADD(vertices, pt);
+    NEW(pt, tsVertex); pt->v[X] =  -1; pt->v[Y] = -3;
+    ADD(vertices, pt);
 }
 
 int main(void)
@@ -199,11 +100,10 @@ int main(void)
     InitWindow(W, H, "Raylib Template");
     SetTargetFPS(60);
 
-    tPointi pt = { 0, 0 };
-    tPointi pt2;
-    print_Vector2(to_screen(pt));
-    from_screen(to_screen(pt), pt2);
-    print_tPointi(pt2);
+    make_polygon();
+    vertices = vertices->next->next->next->next->next->next->next;
+    EarInit();
+    Triangulate(print_diagonal);
 
     float t = 0.f;
     while (!WindowShouldClose()) {
@@ -212,6 +112,21 @@ int main(void)
         if (IsKeyPressed(KEY_SPACE)) {
         }
         BeginDrawing();
+        tVertex v = vertices;
+        int i = 0;
+        do {
+            ++i;
+            Vector2 p = to_screen(v->v);
+            // DrawCircleV(p, 15, RED);
+            Vector2 prev = to_screen(v->prev->v);
+            DrawLineV(prev, p, GREEN);
+            v = v->next;
+        } while (v != vertices);
+        da_foreach(&pdiags, PDiag, pd) {
+            Vector2 p1 = to_screen(pd->a->v);
+            Vector2 p2 = to_screen(pd->b->v);
+            DrawLineV(p1, p2, BLUE);
+        }
         ClearBackground(GetColor(0x181818FF));
         EndDrawing();
         t += DT;
